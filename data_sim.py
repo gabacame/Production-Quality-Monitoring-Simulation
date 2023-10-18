@@ -2,7 +2,7 @@ import sqlite3
 import pandas as pd
 import numpy as np
 
-# Paso 1: Simulación de Datos
+# Paso 1: Simulación de Datos con Tendencia
 
 # Parámetros
 dias = 30
@@ -11,10 +11,12 @@ horas_por_dia = 24
 # Datos simulados
 fechas = pd.date_range(start="2023-10-01", periods=dias*horas_por_dia, freq="H")
 
-produccion = np.random.randint(1000, 5000, size=len(fechas))
-defectuosos = (produccion * np.random.uniform(0.01, 0.05)).astype(int)
+# Tendencia al alza
+tendencia = np.linspace(1000, 5000, len(fechas))
+produccion = (tendencia + np.random.normal(0, 300, len(fechas))).astype(int)
+produccion = np.clip(produccion, 1000, 5000)
 
-# Supongamos una eficiencia inicial del 80% y variaciones aleatorias alrededor de ese valor
+defectuosos = (produccion * np.random.uniform(0.01, 0.05)).astype(int)
 eficiencia = np.clip(np.random.normal(0.8, 0.1, len(fechas)), 0.5, 1.0) * 100
 
 # Inventario de materias primas
@@ -28,7 +30,7 @@ for i in range(1, len(fechas)):
         inventario_actual += 30000
     inventario.append(inventario_actual)
 
-df = pd.DataFrame({
+df_tendencia = pd.DataFrame({
     "fecha": fechas,
     "produccion": produccion,
     "defectuosos": defectuosos,
@@ -38,9 +40,9 @@ df = pd.DataFrame({
 
 # Paso 2: Creación de una Base de Datos en SQL
 
-# Crear una base de datos SQLite y guardar los datos
+# Crear una base de datos SQLite y guardar los datos con tendencia
 db_path = "produccion.db"
 conn = sqlite3.connect(db_path)
-df.to_sql("produccion", conn, if_exists="replace", index=False)
+df_tendencia.to_sql("produccion", conn, if_exists="replace", index=False)
 
-df.head()
+df_tendencia.head()

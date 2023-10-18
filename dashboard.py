@@ -29,7 +29,7 @@ forecast_dates = pd.date_range(train["fecha"].iloc[-1] + pd.Timedelta(hours=1), 
 app = dash.Dash(__name__)
 
 app.layout = html.Div([
-    html.H1("Dashboard de Producción de Laboratorios PiSA"),
+    html.H1("Dashboard de Producción de Laboratorio"),
     
     dcc.Graph(
         id='produccion-tiempo',

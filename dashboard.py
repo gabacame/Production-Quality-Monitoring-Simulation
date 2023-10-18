@@ -5,7 +5,7 @@ import plotly.graph_objs as go
 import sqlite3
 import pandas as pd
 
-db_path = "produccion_pisa.db"
+db_path = "produccion.db"
 conn = sqlite3.connect(db_path)
 query = "SELECT * FROM produccion"
 df_db = pd.read_sql(query, conn)
@@ -14,7 +14,7 @@ df_db["fecha"] = pd.to_datetime(df_db["fecha"])
 app = dash.Dash(__name__)
 
 app.layout = html.Div([
-    html.H1("Dashboard de Producción de Laboratorios PiSA"),
+    html.H1("Dashboard de Producción"),
     
     dcc.Graph(
         id='produccion-tiempo',

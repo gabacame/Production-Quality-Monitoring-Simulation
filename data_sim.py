@@ -39,7 +39,7 @@ df = pd.DataFrame({
 # Paso 2: Creación de una Base de Datos en SQL
 
 # Crear una base de datos SQLite y guardar los datos
-db_path = "produccion_pisa.db"
+db_path = "produccion.db"
 conn = sqlite3.connect(db_path)
 df.to_sql("produccion", conn, if_exists="replace", index=False)
 

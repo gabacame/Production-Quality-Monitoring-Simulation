@@ -4,8 +4,8 @@ import dash_html_components as html
 import plotly.graph_objs as go
 import sqlite3
 import pandas as pd
-from statsmodels.tsa.statespace.sarimax import SARIMAX
-from sklearn.metrics import mean_squared_error, mean_absolute_error
+import numpy as np
+from dash.dependencies import Input, Output
 
 # Leer datos desde la base de datos SQLite
 db_path = "produccion.db"
@@ -14,64 +14,86 @@ query = "SELECT * FROM produccion"
 df_db = pd.read_sql(query, conn)
 df_db["fecha"] = pd.to_datetime(df_db["fecha"])
 
-# Ajuste del modelo SARIMA en el conjunto de entrenamiento
-train_size = int(0.8 * len(df_db))
-train = df_db[:train_size]
-test = df_db[train_size:]
-model = SARIMAX(train["produccion"], order=(1,1,1), seasonal_order=(1,1,1,24))
-results = model.fit()
-
-# Predicción en el conjunto de prueba
-forecast = results.get_forecast(steps=len(test))
-predicted_values = forecast.predicted_mean
-forecast_dates = pd.date_range(train["fecha"].iloc[-1] + pd.Timedelta(hours=1), periods=len(test), freq="H")
+# Supongamos que queremos que la tendencia alcance 6000 después de 30 días adicionales
+slope = (6000 - df_db["produccion"].iloc[-1]) / (30 * 24)
 
 app = dash.Dash(__name__)
 
 app.layout = html.Div([
     html.H1("Dashboard de Producción de Laboratorio"),
     
-    dcc.Graph(
-        id='produccion-tiempo',
-        figure={
-            'data': [
-                go.Scatter(x=df_db['fecha'], y=df_db['produccion'], mode='lines', name='Producción observada'),
-                go.Scatter(x=forecast_dates, y=predicted_values, mode='lines', name='Predicción SARIMA', line=dict(color='red'))
-            ],
-            'layout': go.Layout(title='Producción y Predicción a lo largo del tiempo')
-        }
-    ),
-    
-    dcc.Graph(
-        id='defectuosos-tiempo',
-        figure={
-            'data': [
-                go.Scatter(x=df_db['fecha'], y=df_db['defectuosos'], mode='lines', name='Defectuosos')
-            ],
-            'layout': go.Layout(title='Medicamentos Defectuosos a lo largo del Tiempo')
-        }
-    ),
+    dcc.Graph(id='produccion-tiempo'),
+    dcc.Graph(id='defectuosos-tiempo'),
+    dcc.Graph(id='eficiencia-tiempo'),
+    dcc.Graph(id='inventario-tiempo'),
 
-    dcc.Graph(
-        id='eficiencia-tiempo',
-        figure={
-            'data': [
-                go.Bar(x=df_db['fecha'], y=df_db['eficiencia'], name='Eficiencia')
-            ],
-            'layout': go.Layout(title='Eficiencia de la Línea de Producción por Día')
-        }
-    ),
-    
-    dcc.Graph(
-        id='inventario-tiempo',
-        figure={
-            'data': [
-                go.Scatter(x=df_db['fecha'], y=df_db['inventario'], mode='lines', name='Inventario')
-            ],
-            'layout': go.Layout(title='Nivel de Inventario de Materias Primas a lo largo del Tiempo')
-        }
+    dcc.Interval(
+        id='interval-component',
+        interval=1*1000,  # in milliseconds (1 second for this example)
+        n_intervals=0
     )
 ])
 
+# Establecemos una pendiente basada en la tendencia original
+total_hours = 30 * 24
+slope = (5000 - 1000) / total_hours
+
+def simulate_new_data(last_date, last_production):
+    new_date = last_date + pd.Timedelta(hours=1)
+    
+    # Simulamos la tendencia al alza basada en la pendiente y una pequeña variación
+    new_production = last_production + slope + np.random.normal(0, 300)
+    new_production = int(np.clip(new_production, 1000, 5000))
+    
+    new_defect = int(new_production * np.random.uniform(0.01, 0.05))
+    new_efficiency = np.random.uniform(0.5, 1.0) * 100
+    
+    # Simulamos el inventario
+    consumo = int(new_production * np.random.uniform(0.01, 0.02))
+    new_inventory = df_db["inventario"].iloc[-1] - consumo
+    if new_inventory < 10000 and np.random.random() < 0.1:
+        new_inventory += 30000
+
+    return pd.DataFrame({
+        "fecha": [new_date],
+        "produccion": [new_production],
+        "defectuosos": [new_defect],
+        "eficiencia": [new_efficiency],
+        "inventario": [new_inventory]
+    })
+
+
+@app.callback(
+    [Output('produccion-tiempo', 'figure'),
+     Output('defectuosos-tiempo', 'figure'),
+     Output('eficiencia-tiempo', 'figure'),
+     Output('inventario-tiempo', 'figure')],
+    [Input('interval-component', 'n_intervals')]
+)
+def update_graphs(n_intervals):
+    global df_db
+    new_data = simulate_new_data(df_db["fecha"].iloc[-1], df_db["produccion"].iloc[-1])
+    df_db = pd.concat([df_db, new_data])
+
+    return [
+        {
+            'data': [go.Scatter(x=df_db['fecha'], y=df_db['produccion'], mode='lines', name='Producción observada')],
+            'layout': go.Layout(title='Producción a lo largo del tiempo')
+        },
+        {
+            'data': [go.Scatter(x=df_db['fecha'], y=df_db['defectuosos'], mode='lines', name='Defectuosos')],
+            'layout': go.Layout(title='Medicamentos Defectuosos a lo largo del Tiempo')
+        },
+        {
+            'data': [go.Bar(x=df_db['fecha'], y=df_db['eficiencia'], name='Eficiencia')],
+            'layout': go.Layout(title='Eficiencia de la Línea de Producción por Día')
+        },
+        {
+            'data': [go.Scatter(x=df_db['fecha'], y=df_db['inventario'], mode='lines', name='Inventario')],
+            'layout': go.Layout(title='Nivel de Inventario de Materias Primas a lo largo del Tiempo')
+        }
+    ]
+
 if __name__ == '__main__':
     app.run_server(debug=True)
+

@@ -13,7 +13,7 @@ fechas = pd.date_range(start="2023-10-01", periods=dias*horas_por_dia, freq="H")
 
 # Tendencia al alza
 tendencia = np.linspace(1000, 5000, len(fechas))
-produccion = (tendencia + np.random.normal(0, 300, len(fechas))).astype(int)
+produccion = (tendencia + np.random.normal(0, 30, len(fechas))).astype(int)
 produccion = np.clip(produccion, 1000, 5000)
 
 defectuosos = (produccion * np.random.uniform(0.01, 0.05)).astype(int)
